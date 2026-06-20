@@ -24,24 +24,45 @@
             {{ store.isRunning ? '运行中...' : '▶ 开始模拟' }}
           </button>
         </div>
-        <div v-if="store.result" class="bg-slate-800 rounded-lg p-4 border border-slate-700 text-sm">
+        <div class="bg-slate-800 rounded-lg p-4 border border-slate-700 text-sm">
           <h3 class="text-sm font-bold text-slate-400 mb-3">模拟结果</h3>
-          <div class="space-y-2">
+          <div v-if="store.result" class="space-y-2">
             <div class="flex justify-between"><span class="text-slate-500">估算值</span><span class="text-cyan-400 font-bold font-mono">{{ store.result.estimate.toFixed(6) }}</span></div>
             <div v-if="store.result.trueValue !== undefined" class="flex justify-between"><span class="text-slate-500">真实值</span><span class="text-green-400 font-mono">{{ store.result.trueValue.toFixed(6) }}</span></div>
             <div v-if="store.result.error !== undefined" class="flex justify-between"><span class="text-slate-500">误差</span><span class="text-orange-400 font-mono">{{ store.result.error.toFixed(6) }}</span></div>
             <div class="flex justify-between"><span class="text-slate-500">样本数</span><span class="text-slate-300">{{ store.result.iterations }}</span></div>
+          </div>
+          <div v-else class="py-6 text-center">
+            <div class="text-2xl opacity-60">🧮</div>
+            <div class="text-xs text-slate-400 font-bold mt-2">尚未运行模拟</div>
+            <div class="text-xs text-slate-500 mt-1">选择场景并点击「开始模拟」，运行后将展示估算值、真实值与误差</div>
           </div>
         </div>
       </div>
       <div class="lg:w-3/4 space-y-4">
         <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
           <h3 class="text-sm font-bold text-slate-400 mb-3">收敛过程</h3>
-          <div ref="convergenceRef" class="w-full rounded" style="height:240px;background:#0f172a;"></div>
+          <div class="relative w-full">
+            <div ref="convergenceRef" class="w-full rounded" style="height:240px;background:#0f172a;"></div>
+            <div v-if="!store.result" class="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+              <div class="text-3xl opacity-60">📈</div>
+              <div class="text-sm font-bold text-slate-400 mt-2">暂无收敛数据</div>
+              <div class="text-xs text-slate-500 mt-1 max-w-xs">请在左侧选择模拟场景，点击下方按钮开始模拟，观察估算值随样本量增加的收敛过程</div>
+              <button @click="store.runSimulation" :disabled="store.isRunning" class="mt-3 px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded text-xs font-bold">▶ 开始模拟</button>
+            </div>
+          </div>
         </div>
         <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
           <h3 class="text-sm font-bold text-slate-400 mb-3">样本分布直方图</h3>
-          <div ref="histogramRef" class="w-full rounded" style="height:220px;background:#0f172a;"></div>
+          <div class="relative w-full">
+            <div ref="histogramRef" class="w-full rounded" style="height:220px;background:#0f172a;"></div>
+            <div v-if="!store.result" class="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+              <div class="text-3xl opacity-60">📊</div>
+              <div class="text-sm font-bold text-slate-400 mt-2">暂无样本分布</div>
+              <div class="text-xs text-slate-500 mt-1 max-w-xs">运行模拟后，将在此展示本次采样的分布直方图</div>
+              <button @click="store.runSimulation" :disabled="store.isRunning" class="mt-3 px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded text-xs font-bold">▶ 开始模拟</button>
+            </div>
+          </div>
         </div>
         <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
           <h3 class="text-sm font-bold text-slate-400 mb-3">假设检验 (独立样本 T 检验)</h3>
@@ -55,12 +76,23 @@
               <textarea v-model="group2Input" rows="2" class="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-cyan-500 resize-none"></textarea>
             </div>
           </div>
-          <button @click="runTest" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 rounded text-sm">执行T检验</button>
+          <button @click="runTest" :disabled="!testInputValid" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded text-sm">执行T检验</button>
           <div v-if="store.testResult" class="mt-3 grid grid-cols-4 gap-3 text-sm">
             <div class="bg-slate-900 rounded p-2 text-center"><div class="text-xs text-slate-500 mb-1">统计量 t</div><div class="text-cyan-400 font-bold font-mono">{{ store.testResult.statistic }}</div></div>
             <div class="bg-slate-900 rounded p-2 text-center"><div class="text-xs text-slate-500 mb-1">p 值</div><div class="font-bold font-mono" :class="store.testResult.significant ? 'text-red-400' : 'text-green-400'">{{ store.testResult.pValue }}</div></div>
             <div class="bg-slate-900 rounded p-2 text-center"><div class="text-xs text-slate-500 mb-1">自由度 df</div><div class="text-slate-300 font-mono">{{ store.testResult.df }}</div></div>
             <div class="bg-slate-900 rounded p-2 text-center"><div class="text-xs text-slate-500 mb-1">显著性</div><div class="text-xs font-bold" :class="store.testResult.significant ? 'text-red-400' : 'text-green-400'">{{ store.testResult.significant ? '显著(p<0.05)' : '不显著' }}</div></div>
+          </div>
+          <div v-else class="mt-3 py-6 text-center bg-slate-900 rounded">
+            <div class="text-2xl opacity-60">🔬</div>
+            <template v-if="testInputValid">
+              <div class="text-xs text-slate-400 font-bold mt-2">已就绪</div>
+              <div class="text-xs text-slate-500 mt-1">数据有效，点击「执行T检验」查看统计量 t、p 值与显著性结论</div>
+            </template>
+            <template v-else>
+              <div class="text-xs text-slate-400 font-bold mt-2">暂无检验结果</div>
+              <div class="text-xs text-slate-500 mt-1">请为样本组A、B各输入至少2个数值（逗号分隔），再执行T检验</div>
+            </template>
           </div>
         </div>
       </div>
@@ -69,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import * as echarts from 'echarts'
 import { useMCStore, SCENARIOS } from './store/mc'
 
@@ -109,9 +141,13 @@ function updateCharts() {
   }
 }
 
+function parseGroup(input: string): number[] {
+  return input.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n))
+}
+const testInputValid = computed(() => parseGroup(group1Input.value).length > 1 && parseGroup(group2Input.value).length > 1)
 function runTest() {
-  const g1 = group1Input.value.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n))
-  const g2 = group2Input.value.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n))
+  const g1 = parseGroup(group1Input.value)
+  const g2 = parseGroup(group2Input.value)
   if (g1.length > 1 && g2.length > 1) store.runTest(g1, g2)
 }
 
